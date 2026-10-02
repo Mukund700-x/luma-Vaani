@@ -1,7 +1,4 @@
-"""
-Luma Vaani API — Application Entry Point
-"""
-
+import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -11,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
 from app.core.config import settings
-from app.core.database import engine
+from app.core.database import engine, async_session_factory
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.api.v1.router import api_router
@@ -29,7 +26,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         version=settings.APP_VERSION,
         environment=settings.APP_ENV,
     )
+
+    # ── Start notification background worker ───────────────────────────────────
+    worker_task = None
+    if settings.NOTIFICATIONS_ENABLED:
+        from app.modules.notifications.worker import run_notification_worker
+        worker_task = asyncio.create_task(
+            run_notification_worker(async_session_factory),
+            name="notification_worker",
+        )
+        logger.info("notification_worker_scheduled")
+
     yield
+
+    # ── Graceful shutdown ──────────────────────────────────────────────────────
+    if worker_task and not worker_task.done():
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("notification_worker_stopped")
+
     logger.info("luma_vaani_shutdown")
     await engine.dispose()
 

@@ -210,6 +210,32 @@ class ConversationService:
             language=conv.language,
         )
 
+        # ── 6b. RAG: retrieve relevant hospital knowledge ──────────────────────
+        # Append semantically-retrieved context to the system prompt so the AI
+        # can answer hospital-specific questions (FAQs, policies, hours, etc.)
+        # without hallucinating. Non-fatal — proceeds without context on failure.
+        try:
+            from app.ai.knowledge.embeddings import EmbeddingService
+            from app.ai.knowledge.retriever import KnowledgeRetriever
+            emb_svc = EmbeddingService(api_key=settings.GEMINI_API_KEY or "")
+            if emb_svc.is_available:
+                retriever = KnowledgeRetriever(
+                    db=self._db,
+                    embedding_service=emb_svc,
+                    top_k=settings.KNOWLEDGE_TOP_K,
+                    min_similarity=settings.KNOWLEDGE_MIN_SIMILARITY,
+                )
+                rag_results = await retriever.search(
+                    hospital_id=hospital_id,
+                    query=payload.content,
+                    access_scope="PUBLIC",
+                )
+                if rag_results:
+                    rag_context = KnowledgeRetriever.format_for_llm(rag_results)
+                    system_prompt = system_prompt + "\n\n" + rag_context
+        except Exception:
+            logger.debug("rag_retrieval_skipped", conversation_id=str(conversation_id))
+
         # ── 7. Load conversation history ───────────────────────────────────────
         history = await self._repo.get_chat_history(
             conversation_id, max_turns=settings.AI_MAX_CONVERSATION_TURNS

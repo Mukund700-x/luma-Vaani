@@ -226,8 +226,6 @@ class AppointmentService:
                 "scheduled_at": apt.scheduled_at.isoformat(),
                 "status": apt.status,
                 "source": apt.source,
-                # NOTE: patient_id NOT logged — correlating booking with patient
-                # identity is only done via audit_id + appointment_id lookup
             },
         )
 
@@ -239,6 +237,18 @@ class AppointmentService:
             hospital_id=str(hospital_id),
             source=apt.source,
         )
+
+        # ── Queue confirmation + reminder notifications (non-fatal) ──────────────────
+        try:
+            from app.modules.notifications.service import NotificationService
+            await NotificationService(self._db).queue_for_appointment(
+                appointment_id=apt.id,
+                hospital_id=hospital_id,
+                event_type="appointment.confirmed",
+            )
+        except Exception:
+            logger.warning("notification_queue_failed", appointment_id=str(apt.id))
+
         return AppointmentResponse.model_validate(apt)
 
     # ── Cancel ────────────────────────────────────────────────────────────────

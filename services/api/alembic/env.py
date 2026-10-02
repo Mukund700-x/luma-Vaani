@@ -27,6 +27,10 @@ import app.modules.schedules.models    # noqa: F401
 import app.modules.appointments.models # noqa: F401
 # Phase 4
 import app.modules.conversations.models # noqa: F401
+# Phase 6
+import app.modules.notifications.models  # noqa: F401
+# Phase 5
+import app.modules.knowledge.models       # noqa: F401
 
 config = context.config
 

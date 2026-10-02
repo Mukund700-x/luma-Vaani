@@ -2,12 +2,12 @@
 Main API v1 router — aggregates all module routers.
 
 Phase status:
-  ✅ Phase 1 — auth
-  ✅ Phase 2 — hospitals, departments, doctors, patients
-  ✅ Phase 3 — schedules, availability engine, appointments
-  ✅ Phase 4 — AI conversations (Gemini gateway, tools, safety)
-  🔴 Phase 5 — knowledge / RAG
-  🔴 Phase 6 — notifications
+  ✅ Phase 1 — auth (JWT, refresh, RBAC)
+  ✅ Phase 2 — hospital core (hospitals, departments, doctors, patients)
+  ✅ Phase 3 — scheduling (AvailabilityEngine, appointments, reschedule)
+  ✅ Phase 4 — AI engine (Gemini, 8 tools, safety layer, conversations)
+  ✅ Phase 5 — knowledge / RAG (pgvector, chunking, embeddings, retrieval)
+  ✅ Phase 6 — notifications (SMS/WhatsApp/Email, worker, templates, webhooks)
 """
 
 from fastapi import APIRouter
@@ -22,6 +22,10 @@ from app.modules.schedules.router import router as schedules_router
 from app.modules.appointments.router import router as appointments_router
 # Phase 4
 from app.modules.conversations.router import router as conversations_router
+# Phase 6
+from app.modules.notifications.router import router as notifications_router
+# Phase 5
+from app.modules.knowledge.router import router as knowledge_router
 
 api_router = APIRouter()
 
@@ -41,10 +45,8 @@ api_router.include_router(appointments_router)
 # ── Phase 4: AI Conversations ─────────────────────────────────────────────────
 api_router.include_router(conversations_router)
 
-# ── Phase 5: Knowledge / RAG (upcoming) ───────────────────────────────────────
-# from app.modules.knowledge.router import router as knowledge_router
-# api_router.include_router(knowledge_router)
+# ── Phase 5: Knowledge / RAG ───────────────────────────────────────────────────
+api_router.include_router(knowledge_router)
 
-# ── Phase 6: Notifications (upcoming) ─────────────────────────────────────────
-# from app.modules.notifications.router import router as notifications_router
-# api_router.include_router(notifications_router)
+# ── Phase 6: Notifications ─────────────────────────────────────────────────────
+api_router.include_router(notifications_router)

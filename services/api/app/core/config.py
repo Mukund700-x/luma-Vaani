@@ -70,6 +70,34 @@ class Settings(BaseSettings):
     # ── Rate limiting ─────────────────────────────────────────────────────────
     RATE_LIMIT_PER_MINUTE: int = 60
 
+    # ── Notifications (Phase 6) ───────────────────────────────────────────────
+    NOTIFICATIONS_ENABLED: bool = True
+    NOTIFICATION_RETRY_LIMIT: int = 3
+    NOTIFICATION_WORKER_INTERVAL_SECONDS: int = 30
+
+    # Twilio (SMS + WhatsApp)
+    TWILIO_ACCOUNT_SID: str | None = None
+    TWILIO_AUTH_TOKEN: str | None = None
+    TWILIO_SMS_FROM: str | None = None        # E.164 format: +919876543210
+    TWILIO_WHATSAPP_FROM: str | None = None   # WhatsApp Business number
+
+    # SMTP (Email)
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM_EMAIL: str = "noreply@lumahealth.io"
+    SMTP_FROM_NAME: str = "Luma Vaani"
+    SMTP_USE_TLS: bool = True
+
+    # ── Knowledge / RAG (Phase 5) ─────────────────────────────────────────────────
+    EMBEDDING_MODEL: str = "models/text-embedding-004"
+    EMBEDDING_DIMENSIONS: int = 768
+    KNOWLEDGE_TOP_K: int = 5
+    KNOWLEDGE_MIN_SIMILARITY: float = 0.70
+    KNOWLEDGE_CHUNK_SIZE: int = 1500    # characters per chunk
+    KNOWLEDGE_CHUNK_OVERLAP: int = 200  # characters of overlap between chunks
+
 
 @lru_cache
 def get_settings() -> Settings:

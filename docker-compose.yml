@@ -1,7 +1,32 @@
 version: "3.9"
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  Luma Vaani — Local Development Stack
+#
+#  Services:
+#    postgres  — PostgreSQL 16 + pgvector extension
+#    redis     — Redis 7 (rate limiting, caching, session store)
+#    api       — FastAPI backend (hot-reload in dev, production-grade in prod)
+#    migrate   — One-shot Alembic migration runner (exits after completion)
+#    adminer   — Lightweight DB admin UI (http://localhost:8080)
+#
+#  Quick start:
+#    cp .env.example .env && docker compose up --build
+#
+#  Run migrations only:
+#    docker compose run --rm migrate
+#
+#  Production build (no hot-reload, non-root, uvloop):
+#    docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-common-env: &common-env
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lumauser}:${POSTGRES_PASSWORD:-lumasecret}@postgres:5432/${POSTGRES_DB:-lumadb}
+  REDIS_URL: redis://:${REDIS_PASSWORD:-redissecret}@redis:6379/0
+
 services:
-  # ─── PostgreSQL with pgvector ────────────────────────────────────────────────
+
+  # ─── PostgreSQL 16 + pgvector ─────────────────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg16
     container_name: luma_postgres
@@ -20,13 +45,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
-  # ─── Redis ───────────────────────────────────────────────────────────────────
+  # ─── Redis 7 ──────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: luma_redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:-redissecret} --appendonly yes
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redissecret}
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -37,7 +68,26 @@ services:
       timeout: 5s
       retries: 5
 
-  # ─── FastAPI Backend ─────────────────────────────────────────────────────────
+  # ─── Alembic Migration Runner (exits after completion) ────────────────────
+  migrate:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+      target: development
+    container_name: luma_migrate
+    env_file:
+      - .env
+    environment:
+      <<: *common-env
+    volumes:
+      - ./services/api:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: alembic upgrade head
+    restart: "no"
+
+  # ─── FastAPI Backend (development with hot-reload) ─────────────────────────
   api:
     build:
       context: ./services/api
@@ -48,19 +98,44 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-lumauser}:${POSTGRES_PASSWORD:-lumasecret}@postgres:5432/${POSTGRES_DB:-lumadb}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redissecret}@redis:6379/0
+      <<: *common-env
+      APP_ENV: development
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
+      # Hot-reload: mount source into container
       - ./services/api:/app
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+    healthcheck:
+      test: ["CMD", "curl", "-fsSL", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ─── Adminer (Database Admin UI) ──────────────────────────────────────────
+  # Available at: http://localhost:8080
+  # System: PostgreSQL | Server: postgres | User/Pass: see .env
+  adminer:
+    image: adminer:latest
+    container_name: luma_adminer
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha-dark
 
 volumes:
   postgres_data:
+    name: luma_vaani_postgres_data
   redis_data:
+    name: luma_vaani_redis_data

@@ -28,6 +28,10 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
 )
 
+# Alias used by background workers (notification worker, etc.)
+# Workers call `async with async_session_factory() as db:` for independent sessions
+async_session_factory = AsyncSessionLocal
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency that provides a transactional DB session."""

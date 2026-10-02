@@ -183,6 +183,7 @@ def build_default_registry(timeout_seconds: float = 10.0) -> ToolRegistry:
         CancelAppointmentTool,
     )
     from app.ai.tools.implementations.hospital_info import GetHospitalInfoTool
+    from app.ai.tools.implementations.search_knowledge import SearchKnowledgeTool
 
     registry = ToolRegistry(timeout_seconds=timeout_seconds)
     (
@@ -194,5 +195,7 @@ def build_default_registry(timeout_seconds: float = 10.0) -> ToolRegistry:
         .register(GetPatientAppointmentsTool())
         .register(CancelAppointmentTool())
         .register(GetHospitalInfoTool())
+        # Phase 5: RAG — hospital knowledge base
+        .register(SearchKnowledgeTool())
     )
     return registry
