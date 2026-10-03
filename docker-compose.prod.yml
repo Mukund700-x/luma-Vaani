@@ -1,0 +1,69 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Luma Vaani — Production Docker Compose Override
+#
+#  Usage:
+#    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+#  Differences from development:
+#    - API uses the 'production' Dockerfile target (non-root, no devtools)
+#    - No source volume mount (code baked into image)
+#    - 2 uvicorn workers with uvloop
+#    - No Adminer exposed
+#    - Stricter resource limits
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+      target: production          # non-root, no build tools, uvloop
+    volumes: []                   # No source mount in production
+    environment:
+      APP_ENV: production
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --workers
+      - "2"
+      - --loop
+      - uvloop
+      - --access-log
+      - --no-use-colors
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          memory: 256M
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  redis:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # Disable admin UI in production
+  adminer:
+    profiles:
+      - dev               # Only starts with --profile dev
